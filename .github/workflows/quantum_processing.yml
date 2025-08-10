@@ -26,41 +26,25 @@ jobs:
       - name: 4. Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: 5. Run Other Agents (Quantum, Business, Evolution)
-        id: other_agents
+      - name: 5. Run Core Agents (Quantum, Business, Evolution)
+        id: core_agents
         run: |
           python github_actions_quantum/quantum/belief_quantum.py
-          # Kita sederhanakan untuk sekarang, kita bisa tambahkan lagi nanti
-           python github_actions_quantum/quantum/business_analyzer.py
-           python github_actions_quantum/quantum/evolution_chamber.py
+          # Kita aktifkan yang lain nanti setelah ini berhasil
+          # python github_actions_quantum/quantum/business_analyzer.py
+          # python github_actions_quantum/quantum/evolution_chamber.py
 
-      - name: 6. Report Final Status to Vercel
+      - name: 6. Run Resource Optimizer Agent
+        # Job ini sengaja dipisah agar mudah di-debug
+        # Dia butuh token, jadi kita jalankan terpisah
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python github_actions_quantum/quantum/resource_auditor.py
+
+      - name: 7. Report Final Status to Vercel
         if: always()
         run: |
           curl -X POST "${{ secrets.VERCEL_URL }}/api/status" \
           -H "Content-Type: application/json" \
           -d '{"component": "main-pipeline", "status": "${{ job.status }}"}'
-
-          resource-optimizer:
-    name: ðŸ’¸ Resource Optimizer Audit
-    needs: evolution-chamber # Berjalan di akhir, setelah semua selesai
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-      
-      - name: Setup Python Environment
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      
-      - name: Install Dependencies
-        run: pip install requests
-      
-      - name: Jalankan Audit oleh ResourceOptimizerAgent
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          python github_actions_quantum/quantum/resource_auditor.py
