@@ -12,25 +12,21 @@ jobs:
     name: Code Guardian Security Scan
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    env: # <-- TAMBAHKAN INI
-    VERCEL_URL: ${{ secrets.VERCEL_URL }} # <-- DAN INI
     steps:
       - uses: actions/checkout@v3
       - run: python github_actions_quantum/check_secrets.py
       - name: Report Status to Vercel
         if: always()
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
         run: |
-          curl -X POST "${{ secrets.VERCEL_URL }}/api/status" \
-          -H "Content-Type: application/json" \
-          -d '{"component": "code_guardian", "status": "${{ job.status }}"}'
+          curl -X POST "$VERCEL_URL/api/status" -H "Content-Type: application/json" -d '{"component": "code_guardian", "status": "${{ job.status }}"}'
 
   run-quantum-pipeline:
     name: Execute Quantum BDI Pipeline
     needs: security-scan
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    env: # <-- TAMBAHKAN INI
-    VERCEL_URL: ${{ secrets.VERCEL_URL }} # <-- DAN INI
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -40,28 +36,30 @@ jobs:
           cache-dependency-path: 'requirements.txt'
       - run: pip install -r requirements.txt
       - id: belief
-        run: python github_actions_quantum/quantum/belief_quantum.py
+        run: |
+          python github_actions_quantum/quantum/belief_quantum.py
+          echo "summary_file=$(ls -t artifacts/belief_data | grep 'summary' | head -n 1)" >> $GITHUB_OUTPUT
       - id: desire
-        run: python github_actions_quantum/quantum/desire_quantum.py --belief-file ${{ steps.belief.outputs.summary_file }}
-      - run: python github_actions_quantum/quantum/intention_quantum.py --desire-file ${{ steps.desire.outputs.summary_file }}
+        run: |
+          python github_actions_quantum/quantum/desire_quantum.py --belief-file artifacts/belief_data/${{ steps.belief.outputs.summary_file }}
+          echo "summary_file=$(ls -t artifacts/desire_data | grep 'summary' | head -n 1)" >> $GITHUB_OUTPUT
+      - run: python github_actions_quantum/quantum/intention_quantum.py --desire-file artifacts/desire_data/${{ steps.desire.outputs.summary_file }}
       - uses: actions/upload-artifact@v4
         with:
           name: quantum-bdi-results
           path: artifacts/
       - name: Report Status to Vercel
         if: always()
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
         run: |
-          curl -X POST "${{ secrets.VERCEL_URL }}/api/status" \
-          -H "Content-Type: application/json" \
-          -d '{"component": "quantum_pipeline", "status": "${{ job.status }}"}'
+          curl -X POST "$VERCEL_URL/api/status" -H "Content-Type: application/json" -d '{"component": "quantum_pipeline", "status": "${{ job.status }}"}'
 
   business-analysis:
     name: Business Insight Analysis
     needs: run-quantum-pipeline
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    env: # <-- TAMBAHKAN INI
-    VERCEL_URL: ${{ secrets.VERCEL_URL }} # <-- DAN INI
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -70,18 +68,16 @@ jobs:
       - run: python github_actions_quantum/quantum/business_analyzer.py
       - name: Report Status to Vercel
         if: always()
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
         run: |
-          curl -X POST "${{ secrets.VERCEL_URL }}/api/status" \
-          -H "Content-Type: application/json" \
-          -d '{"component": "business_insight", "status": "${{ job.status }}"}'
+          curl -X POST "$VERCEL_URL/api/status" -H "Content-Type: application/json" -d '{"component": "business_insight", "status": "${{ job.status }}"}'
 
   evolution-chamber:
     name: Evolution Chamber
     needs: business-analysis
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    env: # <-- TAMBAHKAN INI
-    VERCEL_URL: ${{ secrets.VERCEL_URL }} # <-- DAN INI
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -90,17 +86,15 @@ jobs:
       - run: python github_actions_quantum/quantum/evolution_chamber.py
       - name: Report Status to Vercel
         if: always()
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
         run: |
-          curl -X POST "${{ secrets.VERCEL_URL }}/api/status" \
-          -H "Content-Type: application/json" \
-          -d '{"component": "evolution_chamber", "status": "${{ job.status }}"}'
+          curl -X POST "$VERCEL_URL/api/status" -H "Content-Type: application/json" -d '{"component": "evolution_chamber", "status": "${{ job.status }}"}'
 
   self-healing-patrol:
     name: Self-Healing Patrol
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    env: # <-- TAMBAHKAN INI
-    VERCEL_URL: ${{ secrets.VERCEL_URL }} # <-- DAN INI
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -113,33 +107,24 @@ jobs:
         run: python github_actions_quantum/quantum/healing_protocol.py
       - name: Report Status to Vercel
         if: always()
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
         run: |
-          curl -X POST "${{ secrets.VERCEL_URL }}/api/status" \
-          -H "Content-Type: application/json" \
-          -d '{"component": "self_healing", "status": "${{ job.status }}"}'
-
+          curl -X POST "$VERCEL_URL/api/status" -H "Content-Type: application/json" -d '{"component": "self_healing", "status": "${{ job.status }}"}'
+          
   resource-optimizer:
-    name: ðŸ’¸ Resource Optimizer
-    needs: evolution-chamber # Berjalan di akhir, setelah semua selesai
-    if: github.event_name == 'push'
+    name: Resource Optimizer Audit
+    needs: [evolution-chamber, self-healing-patrol]
+    if: always() && (github.event_name == 'push' || github.event_name == 'schedule')
     runs-on: ubuntu-latest
-    env: # <-- TAMBAHKAN INI
-    VERCEL_URL: ${{ secrets.VERCEL_URL }} # <-- DAN INI
     steps:
-      - name: âš¡ Checkout Repository
-        uses: actions/checkout@v3
-      
-      - name: âš™ï¸  Setup Python Environment
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      
-      - name: ðŸ“¦ Install Dependencies
-        run: pip install requests
-      
-      - name: ðŸ§‘â€ðŸ’¼ Jalankan Audit oleh ResourceOptimizerAgent
+      - run: pip install requests
+      - name: Run ResourceOptimizerAgent Audit
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          python github_actions_quantum/quantum/resource_auditor.py        
+        run: python github_actions_quantum/resource_auditor.py
