@@ -12,6 +12,8 @@ jobs:
     name: Code Guardian Security Scan
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    env: # <-- TAMBAHKAN INI
+    VERCEL_URL: ${{ secrets.VERCEL_URL }} # <-- DAN INI
     steps:
       - uses: actions/checkout@v3
       - run: python github_actions_quantum/check_secrets.py
@@ -27,6 +29,8 @@ jobs:
     needs: security-scan
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    env: # <-- TAMBAHKAN INI
+    VERCEL_URL: ${{ secrets.VERCEL_URL }} # <-- DAN INI
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -56,6 +60,8 @@ jobs:
     needs: run-quantum-pipeline
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    env: # <-- TAMBAHKAN INI
+    VERCEL_URL: ${{ secrets.VERCEL_URL }} # <-- DAN INI
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -74,6 +80,8 @@ jobs:
     needs: business-analysis
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    env: # <-- TAMBAHKAN INI
+    VERCEL_URL: ${{ secrets.VERCEL_URL }} # <-- DAN INI
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -91,6 +99,8 @@ jobs:
     name: Self-Healing Patrol
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    env: # <-- TAMBAHKAN INI
+    VERCEL_URL: ${{ secrets.VERCEL_URL }} # <-- DAN INI
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -113,6 +123,8 @@ jobs:
     needs: evolution-chamber # Berjalan di akhir, setelah semua selesai
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    env: # <-- TAMBAHKAN INI
+    VERCEL_URL: ${{ secrets.VERCEL_URL }} # <-- DAN INI
     steps:
       - name: âš¡ Checkout Repository
         uses: actions/checkout@v3
