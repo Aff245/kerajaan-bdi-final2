@@ -4,36 +4,18 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-  schedule:
-    - cron: '*/15 * * * *'
 
 jobs:
   main-pipeline:
-    name: Main Push & Dispatch Pipeline
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    name: Main BDI Pipeline
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
       
       - name: 1. Run Code Guardian Scan
-        id: security_scan
         run: python github_actions_quantum/check_secrets.py
-      - name: Report Guardian Status
-        if: always()
-        env:
-          VERCEL_URL: ${{ secrets.VERCEL_URL }}
-        run: |
-          curl -s -X POST "$VERCEL_URL/api/status" \
-          -H "Content-Type: application/json" \
-          -d '{"component": "code_guardian", "status": "${{ steps.security_scan.outcome }}"}'
 
-      - name: Halt on Security Failure
-        if: steps.security_scan.outcome == 'failure'
-        run: |
-          echo "ðŸš¨ SECURITY SCAN FAILED! Halting pipeline."
-          exit 1
-      
       - name: Setup Python Environment
         uses: actions/setup-python@v4
         with:
@@ -53,22 +35,11 @@ jobs:
           python github_actions_quantum/quantum/evolution_chamber.py
           python github_actions_quantum/resource_auditor.py
 
-  self-healing-patrol:
-    name: Self-Healing Patrol
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with: { python-version: '3.11' }
-      - run: pip install requests
-      - name: Run Patrol
-        env: { VERCEL_URL: ${{ secrets.VERCEL_URL }} }
-        run: python github_actions_quantum/quantum/healing_protocol.py
-      - name: Report Patrol Status
+      - name: Report Final Status to Vercel
         if: always()
-        env: { VERCEL_URL: ${{ secrets.VERCEL_URL }} }
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
         run: |
           curl -s -X POST "$VERCEL_URL/api/status" \
           -H "Content-Type: application/json" \
-          -d '{"component": "self_healing", "status": "${{ job.status }}"}'
+          -d '{"component": "main-pipeline", "status": "${{ job.status }}"}'
