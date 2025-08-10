@@ -8,8 +8,8 @@ on:
     - cron: '*/15 * * * *'
 
 jobs:
-  security-and-bdi-pipeline:
-    name: Main Push Pipeline
+  main-pipeline:
+    name: Main Push & Dispatch Pipeline
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -17,14 +17,22 @@ jobs:
         uses: actions/checkout@v3
       
       - name: 1. Run Code Guardian Scan
+        id: security_scan
         run: python github_actions_quantum/check_secrets.py
-
       - name: Report Guardian Status
         if: always()
         env:
           VERCEL_URL: ${{ secrets.VERCEL_URL }}
         run: |
-          curl -s -X POST "$VERCEL_URL/api/status" -H "Content-Type: application/json" -d '{"component": "code_guardian", "status": "${{ job.status }}"}'
+          curl -s -X POST "$VERCEL_URL/api/status" \
+          -H "Content-Type: application/json" \
+          -d '{"component": "code_guardian", "status": "${{ steps.security_scan.outcome }}"}'
+
+      - name: Halt on Security Failure
+        if: steps.security_scan.outcome == 'failure'
+        run: |
+          echo "ðŸš¨ SECURITY SCAN FAILED! Halting pipeline."
+          exit 1
       
       - name: Setup Python Environment
         uses: actions/setup-python@v4
@@ -36,42 +44,31 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
         
-      - name: 2. Run Business Insight Agent
-        run: python github_actions_quantum/quantum/business_analyzer.py
-      
-      - name: 3. Run Evolution Agent
-        run: python github_actions_quantum/quantum/evolution_chamber.py
-        
-      - name: 4. Run Resource Optimizer Agent
+      - name: 2. Run Other Agents
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python github_actions_quantum/resource_auditor.py
+        run: |
+          python github_actions_quantum/quantum/business_analyzer.py
+          python github_actions_quantum/quantum/evolution_chamber.py
+          python github_actions_quantum/resource_auditor.py
 
   self-healing-patrol:
     name: Self-Healing Patrol
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-        
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install Requests
-        run: pip install requests
-        
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with: { python-version: '3.11' }
+      - run: pip install requests
       - name: Run Patrol
-        env:
-          VERCEL_URL: ${{ secrets.VERCEL_URL }}
+        env: { VERCEL_URL: ${{ secrets.VERCEL_URL }} }
         run: python github_actions_quantum/quantum/healing_protocol.py
-        
       - name: Report Patrol Status
         if: always()
-        env:
-          VERCEL_URL: ${{ secrets.VERCEL_URL }}
+        env: { VERCEL_URL: ${{ secrets.VERCEL_URL }} }
         run: |
-          curl -s -X POST "$VERCEL_URL/api/status" -H "Content-Type: application/json" -d '{"component": "self_healing", "status": "${{ job.status }}"}'
+          curl -s -X POST "$VERCEL_URL/api/status" \
+          -H "Content-Type: application/json" \
+          -d '{"component": "self_healing", "status": "${{ job.status }}"}'
