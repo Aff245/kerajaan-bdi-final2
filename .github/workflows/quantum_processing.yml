@@ -31,8 +31,8 @@ jobs:
         run: |
           python github_actions_quantum/quantum/belief_quantum.py
           # Kita aktifkan yang lain nanti setelah ini berhasil
-          # python github_actions_quantum/quantum/business_analyzer.py
-          # python github_actions_quantum/quantum/evolution_chamber.py
+           python github_actions_quantum/quantum/business_analyzer.py
+           python github_actions_quantum/quantum/evolution_chamber.py
 
       - name: 6. Run Resource Optimizer Agent
         # Job ini sengaja dipisah agar mudah di-debug
