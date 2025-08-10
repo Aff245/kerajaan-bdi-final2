@@ -14,7 +14,15 @@ jobs:
         uses: actions/checkout@v3
 
       - name: 2. Run Code Guardian Scan
+        id: security_scan # Beri ID agar statusnya bisa dibaca
         run: python github_actions_quantum/check_secrets.py
+
+      - name: Report Code Guardian Status
+        if: always()
+        run: |
+          curl -X POST "${{ secrets.VERCEL_URL }}/api/status" \
+          -H "Content-Type: application/json" \
+          -d '{"component": "code_guardian", "status": "${{ steps.security_scan.outcome }}", "data": {"last_run": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"} }'
 
       - name: 3. Setup Python Environment
         uses: actions/setup-python@v4
@@ -26,25 +34,17 @@ jobs:
       - name: 4. Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: 5. Run Core Agents (Quantum, Business, Evolution)
+      - name: 5. Run Core Agents
         id: core_agents
         run: |
           python github_actions_quantum/quantum/belief_quantum.py
-          # Kita aktifkan yang lain nanti setelah ini berhasil
-           python github_actions_quantum/quantum/business_analyzer.py
-           python github_actions_quantum/quantum/evolution_chamber.py
+          python github_actions_quantum/quantum/business_analyzer.py
+          python github_actions_quantum/quantum/evolution_chamber.py
+          python github_actions_quantum/quantum/resource_auditor.py
 
-      - name: 6. Run Resource Optimizer Agent
-        # Job ini sengaja dipisah agar mudah di-debug
-        # Dia butuh token, jadi kita jalankan terpisah
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python github_actions_quantum/quantum/resource_auditor.py
-
-      - name: 7. Report Final Status to Vercel
+      - name: 6. Report Final Pipeline Status
         if: always()
         run: |
           curl -X POST "${{ secrets.VERCEL_URL }}/api/status" \
           -H "Content-Type: application/json" \
-          -d '{"component": "main-pipeline", "status": "${{ job.status }}"}'
+          -d '{"component": "quantum_pipeline", "status": "${{ steps.core_agents.outcome }}", "data": {"last_run": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"} }'
