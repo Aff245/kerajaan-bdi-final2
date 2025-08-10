@@ -107,3 +107,27 @@ jobs:
           curl -X POST "${{ secrets.VERCEL_URL }}/api/status" \
           -H "Content-Type: application/json" \
           -d '{"component": "self_healing", "status": "${{ job.status }}"}'
+
+  resource-optimizer:
+    name: ðŸ’¸ Resource Optimizer
+    needs: evolution-chamber # Berjalan di akhir, setelah semua selesai
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: âš¡ Checkout Repository
+        uses: actions/checkout@v3
+      
+      - name: âš™ï¸  Setup Python Environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: ðŸ“¦ Install Dependencies
+        run: pip install requests
+      
+      - name: ðŸ§‘â€ðŸ’¼ Jalankan Audit oleh ResourceOptimizerAgent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python github_actions_quantum/quantum/resource_auditor.py        
