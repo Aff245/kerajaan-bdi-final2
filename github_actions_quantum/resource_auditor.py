@@ -96,4 +96,3 @@ if __name__ == "__main__":
     efficiency_recommendations = analyze_usage_data(usage_data)
     generate_report(efficiency_recommendations)
     log("Misi selesai.")
-```4.  Simpan dan keluar.
