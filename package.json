@@ -5,6 +5,7 @@
   "main": "api/status/index.js",
   "dependencies": {
     "cors": "^2.8.5",
-    "https": "^1.0.0"
+    "https": "^1.0.0",
+    "@vercel/kv": "^0.2.3"
   }
 }
