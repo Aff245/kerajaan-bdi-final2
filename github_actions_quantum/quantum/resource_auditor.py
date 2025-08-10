@@ -8,91 +8,77 @@ from datetime import datetime
 def log(message):
     """Mencatat aktivitas agen penghemat."""
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[{timestamp}] [ResourceOptimizer] {message}")
+    print(f"[{timestamp}] [ResourceOptimizerAgent] {message}")
 
-def get_github_actions_usage():
+def get_github_actions_usage(repo, token):
     """Mengambil data penggunaan menit GitHub Actions."""
     log("Memeriksa penggunaan menit GitHub Actions...")
-    token = os.getenv("GITHUB_TOKEN")
-    repo = os.getenv("GITHUB_REPOSITORY")
     if not token or not repo:
-        log("WARNING: GITHUB_TOKEN atau GITHUB_REPOSITORY tidak diatur. Melewatkan audit GitHub.")
+        log("WARNING: GITHUB_TOKEN atau GITHUB_REPOSITORY tidak diatur. Audit dilewatkan.")
         return None
-
+    
     try:
-        # API untuk mendapatkan penggunaan Actions untuk sebuah repository
+        # API untuk mendapatkan penggunaan menit untuk repo
         url = f"https://api.github.com/repos/{repo}/actions/usage"
         headers = {"Authorization": f"token {token}"}
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
-        usage_data = response.json()
-        
-        # Free tier GitHub adalah 2000 menit/bulan untuk repo publik/pribadi
-        minutes_used = usage_data.get('billable', {}).get('UBUNTU', {}).get('total_ms', 0) / 60000
-        log(f"-> Penggunaan bulan ini: {minutes_used:.2f} dari 2000 menit (Free Tier).")
-        return {"minutes_used": minutes_used, "limit": 2000}
+        return response.json()
     except requests.exceptions.RequestException as e:
         log(f"ERROR: Gagal mengambil data penggunaan GitHub Actions: {e}")
         return None
 
-def analyze_efficiency(data):
+def analyze_efficiency(usage_data):
     """Menganalisis efisiensi dan memberikan rekomendasi."""
     log("Menganalisis efisiensi sumber daya...")
     recommendations = []
+    
+    if not usage_data:
+        return [{"source": "System", "type": "ERROR", "message": "Tidak bisa mendapatkan data penggunaan."}]
 
-    # Analisis GitHub Actions
-    github_usage = data.get("github_actions")
-    if github_usage:
-        percentage_used = (github_usage['minutes_used'] / github_usage['limit']) * 100
-        
-        if percentage_used > 90:
-            recommendations.append({
-                "type": "ANCAMAN KRITIS",
-                "source": "GitHub Actions",
-                "message": f"Penggunaan menit telah mencapai {percentage_used:.1f}%! Segera optimalkan workflow!",
-                "recommendation": "Nonaktifkan trigger 'on: push' dan gunakan 'workflow_dispatch' (manual) saja."
-            })
-        elif percentage_used > 50:
-             recommendations.append({
-                "type": "PERINGATAN",
-                "source": "GitHub Actions",
-                "message": f"Penggunaan menit di atas 50% ({percentage_used:.1f}%). Waspada terhadap pemborosan.",
-                "recommendation": "Periksa durasi setiap job. Gabungkan langkah 'pip install' jika memungkinkan."
-            })
-        else:
-             recommendations.append({
-                "type": "INFO",
-                "source": "GitHub Actions",
-                "message": f"Penggunaan menit AMAN ({percentage_used:.1f}%). Efisiensi terjaga.",
-                "recommendation": "Tidak ada tindakan yang diperlukan."
-            })
+    # Total menit gratis per bulan untuk akun publik adalah 2000
+    free_minutes_limit = 2000
+    minutes_used = usage_data.get('total_minutes_used', {}).get('total', 0)
+    
+    percentage_used = (minutes_used / free_minutes_limit) * 100
+    
+    log(f"Total menit terpakai bulan ini: {minutes_used} menit ({percentage_used:.2f}% dari batas gratis).")
 
+    if percentage_used > 90:
+        recommendations.append({
+            "source": "GitHub Actions", "type": "PERINGATAN KRITIS",
+            "message": f"Penggunaan menit sudah mencapai {percentage_used:.2f}%! Segera optimalkan workflow."
+        })
+    elif percentage_used > 50:
+         recommendations.append({
+            "source": "GitHub Actions", "type": "PERINGATAN",
+            "message": f"Penggunaan menit di atas 50%. Waspada terhadap pemborosan."
+        })
+    else:
+         recommendations.append({
+            "source": "GitHub Actions", "type": "INFO",
+            "message": f"Penggunaan menit AMAN ({percentage_used:.2f}%). Efisiensi terjaga."
+        })
     return recommendations
 
 def generate_report(recommendations):
     """Menghasilkan laporan optimisasi."""
     log("Menghasilkan laporan optimisasi sumber daya...")
-    if not recommendations:
-        log("Tidak ada rekomendasi. Semua sumber daya digunakan secara efisien.")
-        return
-
     print("\n" + "="*50)
     print("ðŸ’¸ LAPORAN OPTIMISASI SUMBER DAYA ðŸ’¸")
     print("="*50)
     for rec in recommendations:
-        icon = {"ANCAMAN KRITIS": "ðŸ”¥", "PERINGATAN": "âš ï¸ ", "INFO": "âœ…"}
-        print(f"{icon.get(rec['type'], 'ðŸ“ ')} Tipe: {rec['type']} ({rec['source']})")
-        print(f"   - Pesan: {rec['message']}")
-        print(f"   - Rekomendasi Aksi: {rec['recommendation']}")
-        print("-" * 20)
+        icon = {"ERROR": "â Œ", "PERINGATAN KRITIS": "ðŸš¨", "PERINGATAN": "âš ï¸ ", "INFO": "â„¹ï¸ "}.get(rec['type'], "ðŸ“")
+        print(f"{icon} Tipe: {rec['type']} | Sumber: {rec['source']}")
+        print(f"   -> Pesan: {rec['message']}")
     print("="*50)
 
 if __name__ == "__main__":
     log("Misi dimulai: Audit dan optimisasi sumber daya kerajaan...")
-    all_data = {
-        "github_actions": get_github_actions_usage()
-        # Di masa depan, kita bisa tambah audit Vercel, dll.
-    }
-    efficiency_recommendations = analyze_efficiency(all_data)
+    github_repo = os.getenv("GITHUB_REPOSITORY")
+    github_token = os.getenv("GITHUB_TOKEN")
+    
+    usage_info = get_github_actions_usage(github_repo, github_token)
+    efficiency_recommendations = analyze_efficiency(usage_info)
     generate_report(efficiency_recommendations)
     log("Misi selesai.")
